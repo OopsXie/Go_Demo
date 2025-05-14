@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -52,7 +51,7 @@ func main() {
 
 	SaveWords(db, words)
 
-	fmt.Printf("数据插入完毕，共插入%d个单词，耗时：%.2f 秒\n", len(words), time.Since(start).Seconds())
+	fmt.Printf("数据插入完毕，耗时：%.2f 秒\n", time.Since(start).Seconds())
 }
 
 func ReadJSON(filename string) []Words {
@@ -75,40 +74,106 @@ func ReadJSON(filename string) []Words {
 	return words
 }
 
+// func createTable(db *sql.DB) {
+// 	sqlStr := `
+// 	CREATE TABLE IF NOT EXISTS words (
+// 		word TEXT PRIMARY KEY UNIQUE,
+// 		translation TEXT,
+// 		type TEXT,
+// 		phrase TEXT
+// 	);`
+// 	_, err := db.Exec(sqlStr)
+// 	if err != nil {
+// 		log.Fatal("建表失败:", err)
+// 	}
+// }
+
 func createTable(db *sql.DB) {
-	sqlStr := `
+	sqlWords := `
 	CREATE TABLE IF NOT EXISTS words (
-		word TEXT PRIMARY KEY UNIQUE,
+		word TEXT PRIMARY KEY
+	);`
+
+	sqlTranslations := `
+	CREATE TABLE IF NOT EXISTS translations (
+		word TEXT,
 		translation TEXT,
 		type TEXT,
-		phrase TEXT
+		FOREIGN KEY(word) REFERENCES words(word)
 	);`
-	_, err := db.Exec(sqlStr)
+
+	sqlPhrases := `
+	CREATE TABLE IF NOT EXISTS phrases (
+		word TEXT,
+		phrase TEXT,
+		phrase_translation TEXT,
+		FOREIGN KEY(word) REFERENCES words(word)
+	);`
+
+	_, err := db.Exec(sqlWords)
 	if err != nil {
-		log.Fatal("建表失败:", err)
+		log.Fatal("建表 words 失败:", err)
+	}
+
+	_, err = db.Exec(sqlTranslations)
+	if err != nil {
+		log.Fatal("建表 translations 失败:", err)
+	}
+
+	_, err = db.Exec(sqlPhrases)
+	if err != nil {
+		log.Fatal("建表 phrases 失败:", err)
 	}
 }
 
 func SaveWords(db *sql.DB, words []Words) {
 	tx, _ := db.Begin()
-	stmt, _ := tx.Prepare("INSERT OR REPLACE INTO words(word, translation, type, phrase) VALUES (?, ?, ?, ?)")
-	defer stmt.Close()
+
+	stmtWord, _ := tx.Prepare("INSERT OR IGNORE INTO words(word) VALUES (?)")
+	stmtTrans, _ := tx.Prepare("INSERT INTO translations(word, translation, type) VALUES (?, ?, ?)")
+	stmtPhrase, _ := tx.Prepare("INSERT INTO phrases(word, phrase, phrase_translation) VALUES (?, ?, ?)")
+
+	defer stmtWord.Close()
+	defer stmtTrans.Close()
+	defer stmtPhrase.Close()
 
 	for _, w := range words {
-		var transList, typeList, phraseList []string
+		// 插入 word
+		stmtWord.Exec(w.Word)
 
+		// 插入 translations
 		for _, t := range w.Translations {
-			transList = append(transList, t.Translation)
-			typeList = append(typeList, t.Type)
-		}
-		for _, p := range w.Phrases {
-			phraseList = append(phraseList, fmt.Sprintf("%s(%s)", p.Phrase, p.Translation))
+			stmtTrans.Exec(w.Word, t.Translation, t.Type)
 		}
 
-		stmt.Exec(w.Word, strings.Join(transList, "|"), strings.Join(typeList, "|"), strings.Join(phraseList, "|"))
+		// 插入 phrases
+		for _, p := range w.Phrases {
+			stmtPhrase.Exec(w.Word, p.Phrase, p.Translation)
+		}
 	}
 	tx.Commit()
 }
+
+// func SaveWords(db *sql.DB, words []Words) {
+// 	tx, _ := db.Begin()
+// 	stmt, _ := tx.Prepare("INSERT OR REPLACE INTO words(word, translation, type, phrase) VALUES (?, ?, ?, ?)")
+// 	defer stmt.Close()
+
+// 	for _, w := range words {
+// 		var transList, typeList, phraseList []string
+
+// 		for _, t := range w.Translations {
+// 			transList = append(transList, t.Translation)
+// 			typeList = append(typeList, t.Type)
+// 		}
+// 		for _, p := range w.Phrases {
+// 			phraseList = append(phraseList, fmt.Sprintf("%s(%s)", p.Phrase, p.Translation))
+// 		}
+
+// 		stmt.Exec(w.Word, strings.Join(transList, "|"), strings.Join(typeList, "|"), strings.Join(phraseList, "|"))
+// 	}
+// 	tx.Commit()
+// }
 
 // func SaveWords(db *sql.DB, words []Word) {
 // 	for _, w := range words {

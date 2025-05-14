@@ -28,7 +28,22 @@ func GuessNumber(number int, a int, guesses *[]int) bool {
 	var flag = false
 	for i := 0; i < a; i++ {
 		fmt.Printf("第%d次猜测，请输入您的数字（1-100）:", i+1)
-		fmt.Scanln(&guess)
+		_, err := fmt.Scanln(&guess)
+
+		if err != nil {
+			fmt.Println("输入错误，请输入数字")
+			var dump string
+			fmt.Scanln(&dump)
+			i-- //不算这次机会
+			continue
+		}
+
+		if guess < 1 || guess > 100 {
+			fmt.Println("输入错误，请输入1-100之间的数字")
+			i-- //不算这次机会
+			continue
+		}
+
 		*guesses = append(*guesses, guess)
 		if guess == number {
 			flag = true

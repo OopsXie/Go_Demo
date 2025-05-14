@@ -35,14 +35,39 @@
 
 
 ### 表设计
-|   word    |   translation |   type    |   phrase  |
-|-|-|-|-|
-|   abruptly    |   突然地  |   adv |       |
-|   accessible  |   易接近的    |   adj |   readily accessible(易接近的；易达到的；可存取的)    |
+1. words 表（存储单词本体）
+
+| 字段名 | 类型  | 说明       |
+|--------|-------|------------|
+| word   | TEXT  | 单词内容   |
+
+---
+
+2. translations 表（存储单词对应的翻译和词性）
+
+| 字段名      | 类型  | 说明       |
+|-------------|-------|------------|
+| word        | TEXT  | 对应单词   |
+| translation | TEXT  | 翻译内容   |
+| type        | TEXT  | 词性       |
+
+---
+
+3. phrases 表（存储单词对应的短语及释义）
+
+| 字段名            | 类型  | 说明       |
+|------------------|-------|------------|
+| word             | TEXT  | 对应单词   |
+| phrase           | TEXT  | 短语内容   |
+| phrase_translation | TEXT  | 短语释义   |
 
 ## 代码亮点
 - 使用事务批量插入，提升了性能，缩短了运行时间
-- 避免插入重复数据，保证数据唯一，防止丢失
+- 将数据进行规范化存储，分别拆分为 words、translations、phrases 三张表，方便后续管理与查询
+- 保证数据唯一性与完整性：
+  - words 表中每个单词仅存储一次，作为主键
+  - translations 表和 phrases 表通过外键与 words 表关联
+- 插入前自动判断 word 是否存在，存在不重复插入
 - 插入语句关键代码：
   ```
   INSERT OR REPLACE INTO words(word, translation, type, phrase) VALUES (?, ?, ?, ?)
